@@ -27,11 +27,11 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
 const LETTERS = [
-  { ch: "C", speed: 0.6 },
-  { ch: "O", speed: 1.1 },
-  { ch: "P", speed: 0.8 },
-  { ch: "L", speed: 1.5 },
-  { ch: "A", speed: 0.95 },
+  { ch: "C", speed: 0.6,  color: 0x8c949e }, // gris acier
+  { ch: "O", speed: 1.1,  color: 0x2b3038 }, // noir
+  { ch: "P", speed: 0.8,  color: 0x1f6fff }, // bleu
+  { ch: "L", speed: 1.5,  color: 0x8c949e }, // gris acier
+  { ch: "A", speed: 0.95, color: 0x2b3038 }, // noir
 ];
 const SPACING = 2.6;
 
@@ -68,7 +68,9 @@ const items = [];
 await Promise.all(LETTERS.map((L, i) => new Promise((res) => {
   loader.load(`models/${L.ch}.glb`, (gltf) => {
     const root = gltf.scene;
-    root.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
+    // look robot : métal brossé gris / noir / bleu
+    const robot = new THREE.MeshStandardMaterial({ color: L.color, metalness: 0.85, roughness: 0.3, envMapIntensity: 1.2 });
+    root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.material = robot; } });
     const holder = new THREE.Group();
     holder.position.x = (i - (LETTERS.length - 1) / 2) * SPACING;
     holder.add(root);
