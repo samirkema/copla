@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COPLA — Bientôt</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #ececf0; overflow: hidden;
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: #222; }
+  #scene { position: fixed; inset: 0; }
+  .info { position: fixed; left: 0; right: 0; bottom: 9vh; text-align: center; pointer-events: none; }
+  .info h1 { margin: 0; font-size: clamp(16px, 2.4vw, 24px); font-weight: 600; letter-spacing: .25em; text-transform: uppercase; }
+  .info p { margin: .6em 0 0; font-size: clamp(13px, 1.6vw, 16px); opacity: .6; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 14px; opacity: .5; }
+</style>
+</head>
+<body>
+<div id="scene"></div>
+<div id="loading">Chargement…</div>
+<div class="info">
+  <h1>Site en construction</h1>
+  <p>Revenez bientôt</p>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+const LETTERS = [
+  { ch: "C", speed: 0.6 },
+  { ch: "O", speed: 1.1 },
+  { ch: "P", speed: 0.8 },
+  { ch: "L", speed: 1.5 },
+  { ch: "A", speed: 0.95 },
+];
+const SPACING = 2.6;
+
+const el = document.getElementById("scene");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+el.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xececf0);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(4, 8, 6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 6, bottom: -6 });
+scene.add(sun);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.12 }));
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.95;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const loader = new GLTFLoader();
+const items = [];
+
+await Promise.all(LETTERS.map((L, i) => new Promise((res) => {
+  loader.load(`models/${L.ch}.glb`, (gltf) => {
+    const root = gltf.scene;
+    root.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
+    const holder = new THREE.Group();
+    holder.position.x = (i - (LETTERS.length - 1) / 2) * SPACING;
+    holder.add(root);
+    scene.add(holder);
+    const orn = root.getObjectByName("Ornement");
+    items.push({ ...L, holder, root, orn, ornY: orn ? orn.position.y : 0,
+                 angle: 0, jump: 0, phase: i * 0.7 });
+    res();
+  }, undefined, (e) => { console.error(e); res(); });
+})));
+document.getElementById("loading").remove();
+
+// Petite animation au clic : la lettre saute et fait un tour rapide
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  mouse.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(items.map((it) => it.holder), true)[0];
+  if (!hit) { items.forEach((it, i) => setTimeout(() => (it.jump = 1), i * 90)); return; }
+  const it = items.find((it) => it.holder === hit.object.parent?.parent || isChild(it.holder, hit.object));
+  if (it) it.jump = 1;
+});
+function isChild(parent, o) { while (o) { if (o === parent) return true; o = o.parent; } return false; }
+renderer.domElement.addEventListener("pointermove", (e) => {
+  mouse.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  renderer.domElement.style.cursor = ray.intersectObjects(items.map((it) => it.holder), true).length ? "pointer" : "default";
+});
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  // recule la caméra pour que les 5 lettres tiennent dans la largeur (mobile compris)
+  const width = LETTERS.length * SPACING + 1;
+  const hFov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
+  const dist = Math.max(11, (width / 2) / Math.tan(hFov / 2));
+  camera.position.set(0, 1.2, dist);
+  camera.lookAt(0, 0.4, 0);
+  camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+resize();
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  for (const it of items) {
+    let boost = 0;
+    if (it.jump > 0) {
+      it.jump = Math.max(0, it.jump - dt * 1.4);
+      boost = 14 * it.jump;
+    }
+    it.angle += (it.speed + boost) * dt;
+    it.holder.rotation.y = it.angle;
+    const p = 1 - it.jump; // 0 → 1 pendant le saut
+    it.holder.position.y = it.jump > 0 ? Math.sin(p * Math.PI) * 1.2 : 0;
+    if (it.orn) it.orn.position.y = it.ornY + Math.sin(t * 2.2 + it.phase) * 0.08;
+  }
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
