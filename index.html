@@ -5,9 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>COPLA</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #ececf0; overflow: hidden;
+  html, body { margin: 0; height: 100%; overflow: hidden;
+    background: #111;
     font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: #222; }
-  #scene { position: fixed; inset: 0; }
+  /* voile sombre pour que le logo ressorte sur la photo */
+  body::before { content: ""; position: fixed; inset: -20px;
+    background: url("fond.jpg") center / cover no-repeat;
+    filter: blur(5px) brightness(.75) saturate(.9); }
+  body::after { content: ""; position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(255,255,255,.35), rgba(0,0,0,.35) 75%); }
+  #scene { position: fixed; inset: 0; z-index: 1; }
   #loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 14px; opacity: .5; }
 </style>
 </head>
@@ -36,14 +43,14 @@ const LETTERS = [
 const SPACING = 2.6;
 
 const el = document.getElementById("scene");
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setClearColor(0x000000, 0); // fond transparent : la photo est derrière
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 el.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xececf0);
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
@@ -55,8 +62,12 @@ sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 6, bottom: -6 });
 scene.add(sun);
+// contre-jour bleuté pour détacher les lettres sombres du fond
+const rim = new THREE.DirectionalLight(0x9cc4ff, 2.5);
+rim.position.set(-3, 4, -6);
+scene.add(rim);
 
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.12 }));
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.3 }));
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = -0.95;
 ground.receiveShadow = true;
