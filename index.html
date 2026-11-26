@@ -73,7 +73,8 @@ await Promise.all(LETTERS.map((L, i) => new Promise((res) => {
     holder.position.x = (i - (LETTERS.length - 1) / 2) * SPACING;
     holder.add(root);
     scene.add(holder);
-    const orn = root.getObjectByName("Ornement");
+    const orn = null;
+    root.getObjectByName("Ornement")?.removeFromParent(); // pas de flèches au-dessus
     items.push({ ...L, holder, root, orn, ornY: orn ? orn.position.y : 0,
                  angle: 0, jump: 0, phase: i * 0.7 });
     res();
